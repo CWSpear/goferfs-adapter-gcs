@@ -2,7 +2,7 @@ import { goferTests } from 'goferfs-test-suite';
 
 import GcsAdapter from './.';
 
-const API_KEY = process.env.GCS_AKI_KEY;
+const API_KEY = process.env.GCS_API_KEY;
 const BUCKET = process.env.GCS_BUCKET;
 const PROJECT_ID = process.env.GCS_PROJECT_ID;
 
