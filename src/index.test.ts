@@ -6,9 +6,8 @@ const API_KEY = process.env.GCS_AKI_KEY;
 const BUCKET = process.env.GCS_BUCKET;
 const PROJECT_ID = process.env.GCS_PROJECT_ID;
 
-console.log(process.env.TEST_ENV_VAR);
-if (!process.env.TEST_ENV_VAR) {
-    console.log(process.env);
+for (let key in process.env) {
+    console.log(key, process.env[key][0]);
 }
 
 describe('Google Cloud Storage Adapter', function () {
