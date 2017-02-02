@@ -2,7 +2,7 @@
 
 [Gofer](https://github.com/cohesivelabs/goferfs) is a file abstraction library written in Node. It aims to have one consistent API for multiple different storage solutions, called Adapters. This is the Adapter for Google Cloud Storage.
 
-**Notice:** This is mostly working, just seeing a weird issue where you can't create files in the root bucket with service accounts, causing tests to fail.
+**Notice:** Due to an upstream issue with `grpc` (used by `google-cloude-node`), this may not work on Node 7... See https://github.com/GoogleCloudPlatform/google-cloud-node/issues/1753
 
 ## Getting Started
 
