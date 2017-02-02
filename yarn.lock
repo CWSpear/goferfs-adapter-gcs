@@ -1322,9 +1322,9 @@ globals@^9.0.0:
   version "9.14.0"
   resolved "https://registry.yarnpkg.com/globals/-/globals-9.14.0.tgz#8859936af0038741263053b39d0e76ca241e4034"
 
-goferfs-test-suite@^1.0.0-13:
-  version "1.0.0-13"
-  resolved "https://registry.yarnpkg.com/goferfs-test-suite/-/goferfs-test-suite-1.0.0-13.tgz#7c9bb3f0ef4adb4f13e61d00481f8699d427d82e"
+goferfs-test-suite@^1.0.0-17:
+  version "1.0.0-17"
+  resolved "https://registry.yarnpkg.com/goferfs-test-suite/-/goferfs-test-suite-1.0.0-17.tgz#1591638c21a41eadba2a8fef940e82daef1a79ae"
   dependencies:
     "@types/chai" "^3.4.34"
     "@types/chai-as-promised" "^0.0.29"
