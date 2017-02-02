@@ -2,6 +2,7 @@
 
 [Gofer](https://github.com/cohesivelabs/goferfs) is a file abstraction library written in Node. It aims to have one consistent API for multiple different storage solutions, called Adapters. This is the Adapter for Google Cloud Storage.
 
+**Notice:** This is mostly working, just seeing a weird issue where you can't create files in the root bucket with service accounts, causing tests to fail.
 
 ## Getting Started
 
@@ -13,8 +14,8 @@ npm install goferfs goferfs-adapter-gcs
 
 To create an adapter, you need to provide your Project ID, a bucket name, and your authentication from https://console.cloud.google.com/storage.
 
-If the bucket provided does not exist, one will be create with that name. However, it's recommended you create your bucket ahead of time so that you can control what type of storage and which region(s) you want to use. 
- 
+You must create the bucket ahead of time, this adapter assumes one already exists.
+
 Google Cloud supports 3 ways to authenticate: a path to a `keyfile.json`, the contents of a `keyfile.json` or an API key:
  
 
@@ -30,10 +31,8 @@ const gcsAdapter = new GcsAdapter({
 
     // the path to a keyfile.json...
     keyFilename: 'path/to/keyfile.json',
-    // ...or the contents of a keyfile.json...
+    // ...or the contents of a keyfile.json
     credentials: require('path/to/keyfile.json'),
-    // ...or an API key for auth
-    key: '<API KEY>',
 });
 
 const gofer = new Gofer(gcsAdapter);

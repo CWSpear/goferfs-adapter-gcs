@@ -11,7 +11,6 @@ const storage = require('@google-cloud/storage');
 export default class GcsAdapter implements IAdapter {
     private bucket: string;
     private gcs: any;
-    private bucketEnsured: boolean = false;
 
     targetVersion = '1.0';
 
@@ -21,31 +20,36 @@ export default class GcsAdapter implements IAdapter {
 
         // must provide path to keyfile.json...
         keyFilename,
-        // ...or the contents of a keyfile.json...
+        // ...or the contents of a keyfile.json
         credentials,
-        // ...or an API key for auth
-        key,
     }: {
         projectId: string,
         bucket: string,
         keyFilename?: string,
-        credentials?: string,
-        key?: string,
+        credentials?: Object,
     }) {
         this.bucket = bucket;
 
+        if (!bucket) {
+            throw new Error(`You must provide a 'bucket' to the GcsAdapter constructor`);
+        }
+
+        if (!projectId) {
+            throw new Error(`You must provide a 'projectId' to the GcsAdapter constructor`);
+        }
+
+        if (!keyFilename && !credentials) {
+            throw new Error(`You must provide a 'keyFilename' or 'credentials' to the GcsAdapter constructor`);
+        }
+
         this.gcs = storage({
-            projectId: projectId,
-            [
-                (keyFilename && 'keyFilename') ||
-                (credentials && 'credentials') ||
-                (key && 'key')
-            ]: keyFilename || credentials || keyFilename,
+            projectId,
+            [keyFilename ? 'keyFilename' : 'credentials']: keyFilename || credentials,
         });
     }
 
     async write(path: string, contents: string, { visibility }: { visibility: Visibility } = { visibility: Visibility.Public }): Promise<Metadata> {
-        await (await this.getGcsFile(path)).save(contents, {
+        await this.getGcsFile(path).save(contents, {
             [visibility === Visibility.Private ? 'private' : 'public']: true,
         });
 
@@ -53,7 +57,7 @@ export default class GcsAdapter implements IAdapter {
     }
 
     async writeStream(path: string, stream: Stream, { visibility }: { visibility: Visibility } = { visibility: Visibility.Public }): Promise<Metadata> {
-        const gcsFile = await this.getGcsFile(path);
+        const gcsFile = this.getGcsFile(path);
 
         return new Promise((resolve, reject) => {
             stream
@@ -66,7 +70,7 @@ export default class GcsAdapter implements IAdapter {
     }
 
     async move(oldPath: string, newPath: string): Promise<Metadata> {
-        const gcsFile = await this.getGcsFile(oldPath);
+        const gcsFile = this.getGcsFile(oldPath);
 
         await gcsFile.move(newPath);
 
@@ -74,7 +78,7 @@ export default class GcsAdapter implements IAdapter {
     }
 
     async copy(oldPath: string, clonedPath: string): Promise<Metadata> {
-        const gcsFile = await this.getGcsFile(oldPath);
+        const gcsFile = this.getGcsFile(oldPath);
 
         await gcsFile.copy(clonedPath);
 
@@ -82,13 +86,13 @@ export default class GcsAdapter implements IAdapter {
     }
 
     async delete(path: string): Promise<boolean> {
-        await (await this.getGcsFile(path)).delete();
+        await this.getGcsFile(path).delete();
 
         return true;
     }
 
     async deleteDir(path: string): Promise<boolean> {
-        await (await this.getBucket()).deleteFiles({
+        await this.getBucket().deleteFiles({
             prefix: path,
         });
 
@@ -101,11 +105,10 @@ export default class GcsAdapter implements IAdapter {
     }
 
     async setVisibility(path: string, visibility: Visibility): Promise<Metadata> {
-        let response;
         if (visibility === Visibility.Public) {
-            response = await (await this.getGcsFile(path)).makePublic();
+            await this.getGcsFile(path).makePublic();
         } else if (visibility === Visibility.Private) {
-            response = await (await this.getGcsFile(path)).makePrivate();
+            await this.getGcsFile(path).makePrivate();
         } else {
             throw new Error(`Unsupported Visibility: ${visibility}`);
         }
@@ -119,13 +122,13 @@ export default class GcsAdapter implements IAdapter {
     }
 
     async exists(path: string): Promise<boolean> {
-        return (await (await this.getGcsFile(path)).exists())[0];
+        return (await this.getGcsFile(path).exists())[0];
     }
 
     async read(path: string): Promise<any> {
         // GCS only returns streams, so we convert to string
         const { contents, metadata }: any = await Bluebird.props({
-            contents: this.streamToString((await this.getGcsFile(path)).createReadStream()),
+            contents: this.streamToString(this.getGcsFile(path).createReadStream()),
             metadata: this.getMetadata(path),
         });
 
@@ -134,7 +137,7 @@ export default class GcsAdapter implements IAdapter {
 
     async readStream(path: string): Promise<StreamFile> {
         const { stream, metadata }: any = await Bluebird.props({
-            stream: (await this.getGcsFile(path)).createReadStream(),
+            stream: this.getGcsFile(path).createReadStream(),
             metadata: this.getMetadata(path),
         });
 
@@ -142,7 +145,7 @@ export default class GcsAdapter implements IAdapter {
     }
 
     async getMetadata(path: string): Promise<Metadata> {
-        const gcsFile = await this.getGcsFile(path);
+        const gcsFile = this.getGcsFile(path);
 
         const [[metadata], [acl]] = await await Bluebird.all([
             gcsFile.getMetadata(),
@@ -187,25 +190,11 @@ export default class GcsAdapter implements IAdapter {
         });
     }
 
-    private async getGcsFile(path: string): Promise<any> {
-        return (await this.getBucket()).file(path);
+    private getGcsFile(path: string): any {
+        return this.getBucket().file(path);
     }
 
-    private async getBucket(): Promise<any> {
-        const bucket = this.gcs.bucket(this.bucket);
-
-        if (this.bucketEnsured) {
-            return bucket;
-        }
-
-        const [exists] = await bucket.exists();
-
-        if (exists) {
-            return bucket;
-        }
-
-        await bucket.create();
-
-        return bucket;
+    private getBucket(): any {
+        return this.gcs.bucket(this.bucket);
     }
 }
