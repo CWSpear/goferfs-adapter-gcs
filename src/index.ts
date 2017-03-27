@@ -2,16 +2,17 @@ import * as Stream from 'stream';
 import { basename, dirname, extname } from 'path';
 import { lookup as mimeLookup } from 'mime';
 import * as Bluebird from 'bluebird';
-import { IAdapter } from 'goferfs-types/interfaces';
-import { Visibility, Metadata, File, StreamFile } from 'goferfs-types';
+import * as iconv from 'iconv-lite';
+import { IAdapter, Visibility, Metadata, File, StreamFile, WriteOptions, ReadOptions } from 'goferfs-types';
 
 // no typescript support for google-cloud =/
-const storage = require('@google-cloud/storage');
+const storage: any = require('@google-cloud/storage');
 
-export default class GcsAdapter implements IAdapter {
+export class GcsAdapter implements IAdapter<GcsAdapter> {
     private bucket: string;
     private gcs: any;
 
+    adapterName = 'gcs';
     targetVersion = '1.0';
 
     constructor({
@@ -48,7 +49,11 @@ export default class GcsAdapter implements IAdapter {
         });
     }
 
-    async write(path: string, contents: string, { visibility }: { visibility: Visibility } = { visibility: Visibility.Public }): Promise<Metadata> {
+    async write(path: string, contents: string | Buffer, { visibility, encoding }: WriteOptions): Promise<Metadata> {
+        if (typeof contents === 'string' || contents instanceof String) {
+            contents = Buffer.from(<string>contents, encoding);
+        }
+
         await this.getGcsFile(path).save(contents, {
             [visibility === Visibility.Private ? 'private' : 'public']: true,
         });
@@ -56,11 +61,12 @@ export default class GcsAdapter implements IAdapter {
         return this.getMetadata(path);
     }
 
-    async writeStream(path: string, stream: Stream, { visibility }: { visibility: Visibility } = { visibility: Visibility.Public }): Promise<Metadata> {
+    async writeStream(path: string, stream: Stream, { visibility, encoding }: WriteOptions): Promise<Metadata> {
         const gcsFile = this.getGcsFile(path);
 
         return new Promise((resolve, reject) => {
             stream
+                .pipe(iconv.decodeStream(encoding))
                 .pipe(gcsFile.createWriteStream({
                     [visibility === Visibility.Private ? 'private' : 'public']: true,
                 }))
@@ -125,19 +131,25 @@ export default class GcsAdapter implements IAdapter {
         return (await this.getGcsFile(path).exists())[0];
     }
 
-    async read(path: string): Promise<any> {
+    async read(path: string, { encoding }: ReadOptions): Promise<any> {
         // GCS only returns streams, so we convert to string
+        let stream = this.getGcsFile(path).createReadStream();
+
+        if (encoding) {
+            stream = stream.pipe(iconv.decodeStream(encoding || 'utf8'));
+        }
+
         const { contents, metadata }: any = await Bluebird.props({
-            contents: this.streamToString(this.getGcsFile(path).createReadStream()),
+            contents: this.streamToString(stream, encoding === null),
             metadata: this.getMetadata(path),
         });
 
         return new File(metadata, contents);
     }
 
-    async readStream(path: string): Promise<StreamFile> {
+    async readStream(path: string, { encoding }: ReadOptions): Promise<StreamFile> {
         const { stream, metadata }: any = await Bluebird.props({
-            stream: this.getGcsFile(path).createReadStream(),
+            stream: this.getGcsFile(path).createReadStream().pipe(iconv.decodeStream(encoding || 'utf8')),
             metadata: this.getMetadata(path),
         });
 
@@ -180,9 +192,19 @@ export default class GcsAdapter implements IAdapter {
         return Visibility.Private;
     }
 
-    private streamToString(stream: Stream): Promise<string> {
+    private streamToString(stream: Stream, returnAsBuffer: boolean): Promise<string> {
+        if (returnAsBuffer) {
+            return new Promise((resolve, reject) => {
+                const chunks: Buffer[] = [];
+                stream
+                    .on('data', (chunk: Buffer) => chunks.push(chunk))
+                    .on('end', () => resolve(Buffer.concat(chunks)))
+                    .on('error', reject);
+            });
+        }
+
         return new Promise((resolve, reject) => {
-            const chunks: Array<string> = [];
+            const chunks: string[] = [];
             stream
                 .on('data', (chunk: string) => chunks.push(chunk))
                 .on('end', () => resolve(chunks.join('')))
